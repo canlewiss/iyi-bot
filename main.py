@@ -29,7 +29,7 @@ logging.basicConfig(
 # --------------------------------------------------
 # ENV
 # --------------------------------------------------
-TOKEN = os.getenv("8855568852:AAG8I-2B_ZjkWQVIR5a4GL0PjzyyR5aZ3kg")
+TOKEN = "8855568852:AAG8I-2B_ZjkWQVIR5a4GL0PjzyyR5aZ3kg"
 PARTI_GRUP_ID = int(os.getenv("PARTI_GRUP_ID", "0"))
 PARTI_KONU_ID = int(os.getenv("PARTI_KONU_ID", "0"))
 
