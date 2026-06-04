@@ -15,6 +15,9 @@ TOKEN = "8855568852:AAG8I-2B_ZjkWQVIR5a4GL0PjzyyR5aZ3kg"
 # YÖNETİCİ ID LİSTESİ
 YONETICILER = [7924242319, 1293227694, 5656861374]
 
+# SUNDAY CITY GRUBUNUN ID NUMARASI
+GRUP_ID = -1003991253158
+
 # YASAKLI KELİMELER LİSTESİ
 KUFURLER = ["küfür1", "küfür2", "argo1", "aptal", "salak"] 
 
@@ -34,35 +37,44 @@ KURALLAR_METNI = """📜 **Sunday City Resmi Grup Kuralları:**
 3️⃣ Oyun içi hile satışı/paylaşımı yasaktır.
 İyi oyunlar! 🎮"""
 
-
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     await update.message.reply_text(f"Merhaba {user.first_name}! Ben Sunday City asistanıyım. Şehirde işler yolunda. 🚀")
 
-# DUYURU KOMUTU (Sadece Yöneticiler Grupta Kullanabilir)
+# DUYURU KOMUTU (Sadece Özelden Çalışır ve Sabitler)
 async def duyuru_komutu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id not in YONETICILER:
-        return # Yönetici değilse hiçbir tepki verme
+    kullanici_id = update.effective_user.id
+    
+    if kullanici_id not in YONETICILER:
+        return
 
-    # Komuttan sonraki mesaj kısmını al
+    # Sadece Özel Mesajdan (DM) atılmasına izin ver
+    if update.effective_chat.type != "private":
+        await update.message.reply_text("⚠️ Güvenlik gereği duyuruları sadece bana özelden (DM) mesaj atarak yapabilirsin!")
+        try:
+            await update.message.delete() # Grupta komut yazdıysa gizlemek için siler
+        except Exception:
+            pass
+        return
+
     mesaj = update.message.text.replace("/duyuru", "").strip()
 
     if not mesaj:
-        await update.message.reply_text("⚠️ Kullanım şekli: /duyuru [Yazmak istediğiniz mesaj]")
+        await update.message.reply_text("⚠️ Kullanım şekli: /duyuru [Yazmak istediğiniz duyuru metni]")
         return
 
-    # Eğer komut grupta yazıldıysa orijinal mesajı sil
-    if update.effective_chat.type in ["group", "supergroup"]:
-        try:
-            await update.message.delete()
-        except Exception as e:
-            logger.warning(f"Duyuru komutu silinemedi: {e}")
-
-        # Botun ağzından duyuruyu yap
-        duyuru_metni = f"📢 **DUYURU**\n\n{mesaj}"
-        await context.bot.send_message(chat_id=update.message.chat_id, text=duyuru_metni, parse_mode="Markdown")
-    else:
-        await update.message.reply_text("⚠️ Bu komutu duyuru yapmak istediğin grubun içine yazmalısın!")
+    try:
+        # 1. Aşama: Mesajı gruba gönder
+        duyuru_metni = f"📢 **YÖNETİM DUYURUSU**\n\n{mesaj}"
+        giden_mesaj = await context.bot.send_message(chat_id=GRUP_ID, text=duyuru_metni, parse_mode="Markdown")
+        
+        # 2. Aşama: Gönderilen mesajı grupta başa sabitle (Pin)
+        await context.bot.pin_chat_message(chat_id=GRUP_ID, message_id=giden_mesaj.message_id)
+        
+        # 3. Aşama: Yöneticiye başarı mesajı dön
+        await update.message.reply_text("✅ Duyuru başarıyla Sunday City grubuna gönderildi ve başa sabitlendi!")
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ Hata oluştu! Botun grupta 'Mesaj Sabitleme' (Pin) yetkisi olduğundan emin ol. (Hata detayı: {e})")
 
 async def yeni_uyeleri_karsila(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for yeni_uye in update.message.new_chat_members:
@@ -84,7 +96,6 @@ async def yeni_uyeleri_karsila(update: Update, context: ContextTypes.DEFAULT_TYP
         except Exception:
             pass
 
-# YÖNETİCİ DM SOHBET VE KÜFÜR KONTROL SİSTEMİ
 async def metin_kontrol(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
         return
@@ -92,14 +103,13 @@ async def metin_kontrol(update: Update, context: ContextTypes.DEFAULT_TYPE):
     mesaj = update.message.text
     kullanici_id = update.effective_user.id
 
-    # 1. DURUM: EĞER MESAJ ÖZELDEN (DM) VE BİR YÖNETİCİDEN GELİYORSA (Yapay Zeka Altyapısı)
     if update.effective_chat.type == "private":
         if kullanici_id in YONETICILER:
-            # Buraya ileride yapay zeka entegrasyonu gelecek
-            await update.message.reply_text(f"🤖 Yönetici sistemine bağlandınız. Şu an gerçek bir yapay zeka modülüm yok, ama mesajını aldım: '{mesaj}'\n\n(Beni tam bir yapay zekaya çevirmek istersen geliştiriciye API bağlamasını söyleyebilirsin!)")
+            # DM'den duyuru komutu harici bir şey yazılırsa cevap verir
+            if not mesaj.startswith("/"):
+                await update.message.reply_text("🤖 Yönetici Paneli: Gruba duyuru yapmak için /duyuru [mesajınız] komutunu kullanabilirsiniz.")
         return
 
-    # 2. DURUM: EĞER MESAJ GRUPTAN GELİYORSA (Küfür Kontrolü)
     mesaj_kucuk = mesaj.lower()
     chat_id = update.message.chat_id
     kullanici = update.effective_user
@@ -174,12 +184,12 @@ def main():
     app = Application.builder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("duyuru", duyuru_komutu)) # Yeni Duyuru Komutu
+    app.add_handler(CommandHandler("duyuru", duyuru_komutu))
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, yeni_uyeleri_karsila))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, metin_kontrol)) # Güncellenmiş Metin Dinleyici
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, metin_kontrol))
     app.add_handler(CallbackQueryHandler(buton_tiklama_yoneticisi))
 
-    logger.info("✅ Bot başarıyla ayağa kalktı. Duyuru sistemi ve AI altyapısı aktif...")
+    logger.info("✅ Bot başarıyla ayağa kalktı. DM duyuru ve pinleme sistemi aktif...")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
