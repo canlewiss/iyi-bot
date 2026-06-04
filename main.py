@@ -12,40 +12,27 @@ logger = logging.getLogger(__name__)
 # DOĞRUDAN EKLENMİŞ TOKEN
 TOKEN = "8855568852:AAG8I-2B_ZjkWQVIR5a4GL0PjzyyR5aZ3kg"
 
-# Pazar Şehri evrenine uygun GRUP Karşılama Mesajları
+# YÖNETİCİ ID LİSTESİ (Üç yönetici de buraya eklendi)
+YONETICILER = [7924242319, 1293227694, 5656861374]
+
+# YASAKLI KELİMELER LİSTESİ
+KUFURLER = ["küfür1", "küfür2", "argo1", "aptal", "salak"] 
+
+# GRUP VE ÖZEL KARŞILAMA MESAJLARI
 GRUP_MESAJLARI = [
     "🔥 Şehre yeni biri giriş yaptı! Hoş geldin {isim}, Sunday City sokakları seni bekliyor.",
     "👋 {isim} aramıza katıldı! Sunday City'de adını duyurmaya hazır mısın?",
-    "🏙️ Yeni bir efsane mi doğuyor? Sunday City'nin en yeni sakini {isim}, hoş geldin!",
-    "🚨 Dikkat! {isim} şehre adım attı. Pazar Şehri kurallarına uymayı unutma!",
-    "😎 Sunday City ailesi büyüyor! Mekanın yeni sahibi {isim} hoş geldin."
+    "🏙️ Yeni bir efsane mi doğuyor? Sunday City'nin en yeni sakini {isim}, hoş geldin!"
 ]
-
-# Pazar Şehri evrenine uygun ÖZEL (DM) Karşılama Mesajları
 OZEL_MESAJLAR = [
-    "Selam {isim}! Sunday City grubuna katıldığın için teşekkürler. Herhangi bir sorun olursa yöneticilere ulaşmaktan çekinme. İyi oyunlar! 🎮",
-    "Hoş geldin {isim}! Burası Sunday City arka planı. Şehirde hayatta kalmak için gruptaki sabitlenmiş kuralları okumayı unutma! 📜",
-    "Sunday City'nin kalbine, resmi grubumuza hoş geldin {isim}! Oyunla ilgili taktiklere ihtiyacın olursa grupta sormaktan çekinme. 🚀"
+    "Selam {isim}! Sunday City grubuna katıldığın için teşekkürler. Herhangi bir sorun olursa yöneticilere ulaşmaktan çekinme. İyi oyunlar! 🎮"
 ]
 
-# BUTONA TIKLANDIĞINDA GÖRÜNECEK DETAYLI KURALLAR METNİ
 KURALLAR_METNI = """📜 **Sunday City Resmi Grup Kuralları:**
-
-Şehrimizin huzuru ve oyun deneyimimizin kalitesi için aşağıdaki kurallara uymak zorunludur:
-
-1️⃣ **Saygı ve Üslup:** Grup içerisinde küfür, argo, hakaret ve aşağılayıcı kelimeler kullanmak kesinlikle yasaktır. Din, dil, ırk ayrımı yapmak ve siyasi tartışmalara girmek anında uzaklaştırma (ban) sebebidir.
-
-2️⃣ **Spam ve Reklam:** Başka Telegram gruplarının, Discord sunucularının veya farklı oyunların reklamını yapmak, referans (davet) linkleri paylaşmak yasaktır. Sohbet akışını bozacak şekilde art arda mesaj (flood) atmaktan, anlamsız GIF veya çıkartma spamı yapmaktan kaçının.
-
-3️⃣ **Oyun İçi Hile ve Ticaret:** Oyunda haksız avantaj sağlayan 3. parti yazılım (hile, modlu APK, makro vb.) paylaşımı veya teşviki yasaktır. Gerçek parayla (TL, Kripto vb.) hesap alım-satımı veya takası grupta yasaktır; olası dolandırıcılık durumlarında yönetim sorumluluk kabul etmez.
-
-4️⃣ **Kişisel Gizlilik:** Kendi güvenliğiniz veya başkalarının güvenliği için telefon numarası, adres, şifre gibi kişisel bilgilerinizi grupta kesinlikle paylaşmayın.
-
-5️⃣ **Yardımlaşma:** Oyuna yeni başlayanlara karşı sabırlı ve yardımsever olun. Şehre yeni adım atmış oyunculara Sunday City'de hayatta kalma taktikleri vererek topluluğumuzu güçlendirin.
-
-6️⃣ **Yönetim Kararları:** Grup yöneticileri (Adminler) kuralları uygulama ve kural ihlali durumunda uyarı yapmadan gruptan çıkarma hakkına sahiptir. Yönetim kararlarıyla ilgili şikayetlerinizi grupta tartışmak yerine yöneticilere özel mesaj (DM) yoluyla iletebilirsiniz.
-
-Şehre katkı sağladığın için teşekkürler! İyi oyunlar dileriz! 🎮🏙️"""
+1️⃣ Saygı esastır. Küfür, hakaret ve siyaset anında ban sebebidir.
+2️⃣ Spam ve reklam yasaktır.
+3️⃣ Oyun içi hile satışı/paylaşımı yasaktır.
+İyi oyunlar! 🎮"""
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -53,56 +40,115 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def yeni_uyeleri_karsila(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for yeni_uye in update.message.new_chat_members:
-        # Botların gruba katılmasını yoksay
         if yeni_uye.is_bot:
             continue
         
         isim = yeni_uye.first_name
-
-        # 1. Aşama: Rastgele mesajı seç ve "kuralları okumayı unutma" ekini yapıştır
         secilen_grup_mesaji = random.choice(GRUP_MESAJLARI).format(isim=isim)
         tam_mesaj = f"{secilen_grup_mesaji}\n\nGrup kurallarımızı okumayı unutma ☺️"
-
-        # 2. Aşama: Butonu Oluştur
-        klavye = [
-            [InlineKeyboardButton("📜 Grup Kurallarımız", callback_data="kurallari_goster")]
-        ]
+        
+        klavye = [[InlineKeyboardButton("📜 Grup Kurallarımız", callback_data="kurallari_goster")]]
         reply_markup = InlineKeyboardMarkup(klavye)
-
-        # 3. Aşama: Mesajı butonla birlikte gruba gönder
+        
         await update.message.reply_text(tam_mesaj, reply_markup=reply_markup)
 
-        # 4. Aşama: Kişiye özelden mesaj gönder (Önceki güvenli sistem)
         secilen_ozel_mesaj = random.choice(OZEL_MESAJLAR).format(isim=isim)
         try:
             await context.bot.send_message(chat_id=yeni_uye.id, text=secilen_ozel_mesaj)
-            logger.info(f"{isim} adlı kişiye özel mesaj gönderildi.")
-        except Exception as e:
-            logger.warning(f"{isim} adlı kişiye özel mesaj gönderilemedi (Bota start vermemiş olabilir).")
+        except Exception:
+            pass
 
-# Butona tıklandığında çalışacak olan fonksiyon
+# Küfür ve Hakaret Kontrol Sistemi
+async def kufur_kontrol(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message or not update.message.text:
+        return
+
+    mesaj = update.message.text.lower()
+    kullanici = update.effective_user
+    chat_id = update.message.chat_id
+
+    for kufur in KUFURLER:
+        if kufur in mesaj:
+            # 1. Kötü mesajı gruptan sil
+            try:
+                await update.message.delete()
+            except Exception as e:
+                logger.warning(f"Mesaj silinemedi: {e}")
+
+            # 2. Oyuncuyu grupta etiketleyerek uyar
+            await context.bot.send_message(
+                chat_id=chat_id, 
+                text=f"⚠️ {kullanici.first_name}, kuralları ihlal ettin! Küfür/hakaret içerikli mesaj göndermek yasaktır. Yöneticilere bildirildi."
+            )
+
+            # 3. Tüm yöneticilere onay butonlu özel mesaj gönder
+            klavye = [
+                [
+                    InlineKeyboardButton("✅ Evet (Gruptan At)", callback_data=f"at_{chat_id}_{kullanici.id}"),
+                    InlineKeyboardButton("❌ Hayır (Uyarı Yeterli)", callback_data="iptal_et")
+                ]
+            ]
+            reply_markup = InlineKeyboardMarkup(klavye)
+            
+            yonetici_mesaji = (
+                f"🚨 **Kural İhlali Bildirimi!**\n\n"
+                f"Üye: {kullanici.first_name} (@{kullanici.username if kullanici.username else 'Kullanıcı adı yok'})\n"
+                f"Mesajı: {update.message.text}\n\n"
+                f"Bu oyuncuyu gruptan atmak ister misiniz?"
+            )
+            
+            # Döngü ile listedeki tüm 3 yöneticiye mesajı ulaştırıyoruz
+            for yonetici_id in YONETICILER:
+                try:
+                    await context.bot.send_message(chat_id=yonetici_id, text=yonetici_mesaji, reply_markup=reply_markup, parse_mode="Markdown")
+                except Exception as e:
+                    logger.error(f"{yonetici_id} ID'li yöneticiye mesaj atılamadı. Botu DM'den başlatmamış olabilir: {e}")
+            
+            break
+
 async def buton_tiklama_yoneticisi(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
+    tiklayan_kisi = query.from_user
     
-    # Telegram'a "Tıklamayı algıladım, yükleniyor ikonunu durdur" diyoruz
     await query.answer() 
 
-    # Eğer tıklanan butonun verisi (callback_data) "kurallari_goster" ise:
+    # Grup Kuralları Butonu (Herkes tıklayabilir)
     if query.data == "kurallari_goster":
-        # Kurallar metnini gruba gönder
-        await query.message.reply_text(KURALLAR_METNI)
+        try:
+            await context.bot.send_message(chat_id=tiklayan_kisi.id, text=KURALLAR_METNI)
+            await query.answer(text="📜 Kurallar özel mesaj olarak sana gönderildi!", show_alert=False)
+        except Exception:
+            await query.answer(text="⚠️ Kuralları gönderebilmem için botun üzerine tıklayıp önce /start mesajı atmalısın!", show_alert=True)
+            
+    # Moderasyon Butonları (Sadece listedeki YÖNETİCİLER tıklayabilir)
+    elif query.data.startswith("at_") or query.data == "iptal_et":
+        if tiklayan_kisi.id not in YONETICILER:
+            await query.answer(text="⚠️ Bu butonu kullanmaya yetkiniz yok!", show_alert=True)
+            return
+
+        if query.data.startswith("at_"):
+            veri = query.data.split("_")
+            grup_id = int(veri[1])
+            atilan_kisi_id = int(veri[2])
+            
+            try:
+                await context.bot.ban_chat_member(chat_id=grup_id, user_id=atilan_kisi_id)
+                await query.edit_message_text(text=f"{query.message.text}\n\n✅ **İşlem Başarılı:** Oyuncu {tiklayan_kisi.first_name} tarafından gruptan atıldı!", parse_mode="Markdown")
+            except Exception as e:
+                await query.edit_message_text(text=f"{query.message.text}\n\n⚠️ **Hata:** Oyuncu atılamadı. Botun grupta yetkilerini kontrol edin.", parse_mode="Markdown")
+                
+        elif query.data == "iptal_et":
+            await query.edit_message_text(text=f"{query.message.text}\n\n❌ **İşlem İptal Edildi:** {tiklayan_kisi.first_name} sadece uyarı verilmesini seçti.", parse_mode="Markdown")
 
 def main():
     app = Application.builder().token(TOKEN).build()
 
-    # Komut ve Dinleyiciler (Handlers)
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, yeni_uyeleri_karsila))
-    
-    # Buton tıklamalarını dinleyecek eklenti
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, kufur_kontrol))
     app.add_handler(CallbackQueryHandler(buton_tiklama_yoneticisi))
 
-    logger.info("✅ Bot başarıyla ayağa kalktı, butonlar ve detaylı kurallar aktif...")
+    logger.info("✅ Bot başarıyla ayağa kalktı. Üçlü yönetici sistemi ve küfür filtresi aktif...")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
