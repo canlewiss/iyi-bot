@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 # DOĞRUDAN EKLENMİŞ TOKEN
 TOKEN = "8855568852:AAG8I-2B_ZjkWQVIR5a4GL0PjzyyR5aZ3kg"
 
-# YÖNETİCİ ID LİSTESİ (Üç yönetici de buraya eklendi)
+# YÖNETİCİ ID LİSTESİ
 YONETICILER = [7924242319, 1293227694, 5656861374]
 
 # YASAKLI KELİMELER LİSTESİ
@@ -34,9 +34,35 @@ KURALLAR_METNI = """📜 **Sunday City Resmi Grup Kuralları:**
 3️⃣ Oyun içi hile satışı/paylaşımı yasaktır.
 İyi oyunlar! 🎮"""
 
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     await update.message.reply_text(f"Merhaba {user.first_name}! Ben Sunday City asistanıyım. Şehirde işler yolunda. 🚀")
+
+# DUYURU KOMUTU (Sadece Yöneticiler Grupta Kullanabilir)
+async def duyuru_komutu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id not in YONETICILER:
+        return # Yönetici değilse hiçbir tepki verme
+
+    # Komuttan sonraki mesaj kısmını al
+    mesaj = update.message.text.replace("/duyuru", "").strip()
+
+    if not mesaj:
+        await update.message.reply_text("⚠️ Kullanım şekli: /duyuru [Yazmak istediğiniz mesaj]")
+        return
+
+    # Eğer komut grupta yazıldıysa orijinal mesajı sil
+    if update.effective_chat.type in ["group", "supergroup"]:
+        try:
+            await update.message.delete()
+        except Exception as e:
+            logger.warning(f"Duyuru komutu silinemedi: {e}")
+
+        # Botun ağzından duyuruyu yap
+        duyuru_metni = f"📢 **DUYURU**\n\n{mesaj}"
+        await context.bot.send_message(chat_id=update.message.chat_id, text=duyuru_metni, parse_mode="Markdown")
+    else:
+        await update.message.reply_text("⚠️ Bu komutu duyuru yapmak istediğin grubun içine yazmalısın!")
 
 async def yeni_uyeleri_karsila(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for yeni_uye in update.message.new_chat_members:
@@ -58,30 +84,38 @@ async def yeni_uyeleri_karsila(update: Update, context: ContextTypes.DEFAULT_TYP
         except Exception:
             pass
 
-# Küfür ve Hakaret Kontrol Sistemi
-async def kufur_kontrol(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# YÖNETİCİ DM SOHBET VE KÜFÜR KONTROL SİSTEMİ
+async def metin_kontrol(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
         return
 
-    mesaj = update.message.text.lower()
-    kullanici = update.effective_user
+    mesaj = update.message.text
+    kullanici_id = update.effective_user.id
+
+    # 1. DURUM: EĞER MESAJ ÖZELDEN (DM) VE BİR YÖNETİCİDEN GELİYORSA (Yapay Zeka Altyapısı)
+    if update.effective_chat.type == "private":
+        if kullanici_id in YONETICILER:
+            # Buraya ileride yapay zeka entegrasyonu gelecek
+            await update.message.reply_text(f"🤖 Yönetici sistemine bağlandınız. Şu an gerçek bir yapay zeka modülüm yok, ama mesajını aldım: '{mesaj}'\n\n(Beni tam bir yapay zekaya çevirmek istersen geliştiriciye API bağlamasını söyleyebilirsin!)")
+        return
+
+    # 2. DURUM: EĞER MESAJ GRUPTAN GELİYORSA (Küfür Kontrolü)
+    mesaj_kucuk = mesaj.lower()
     chat_id = update.message.chat_id
+    kullanici = update.effective_user
 
     for kufur in KUFURLER:
-        if kufur in mesaj:
-            # 1. Kötü mesajı gruptan sil
+        if kufur in mesaj_kucuk:
             try:
                 await update.message.delete()
-            except Exception as e:
-                logger.warning(f"Mesaj silinemedi: {e}")
+            except Exception:
+                pass
 
-            # 2. Oyuncuyu grupta etiketleyerek uyar
             await context.bot.send_message(
                 chat_id=chat_id, 
                 text=f"⚠️ {kullanici.first_name}, kuralları ihlal ettin! Küfür/hakaret içerikli mesaj göndermek yasaktır. Yöneticilere bildirildi."
             )
 
-            # 3. Tüm yöneticilere onay butonlu özel mesaj gönder
             klavye = [
                 [
                     InlineKeyboardButton("✅ Evet (Gruptan At)", callback_data=f"at_{chat_id}_{kullanici.id}"),
@@ -93,17 +127,15 @@ async def kufur_kontrol(update: Update, context: ContextTypes.DEFAULT_TYPE):
             yonetici_mesaji = (
                 f"🚨 **Kural İhlali Bildirimi!**\n\n"
                 f"Üye: {kullanici.first_name} (@{kullanici.username if kullanici.username else 'Kullanıcı adı yok'})\n"
-                f"Mesajı: {update.message.text}\n\n"
+                f"Mesajı: {mesaj}\n\n"
                 f"Bu oyuncuyu gruptan atmak ister misiniz?"
             )
             
-            # Döngü ile listedeki tüm 3 yöneticiye mesajı ulaştırıyoruz
-            for yonetici_id in YONETICILER:
+            for yonetici in YONETICILER:
                 try:
-                    await context.bot.send_message(chat_id=yonetici_id, text=yonetici_mesaji, reply_markup=reply_markup, parse_mode="Markdown")
-                except Exception as e:
-                    logger.error(f"{yonetici_id} ID'li yöneticiye mesaj atılamadı. Botu DM'den başlatmamış olabilir: {e}")
-            
+                    await context.bot.send_message(chat_id=yonetici, text=yonetici_mesaji, reply_markup=reply_markup, parse_mode="Markdown")
+                except Exception:
+                    pass
             break
 
 async def buton_tiklama_yoneticisi(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -112,7 +144,6 @@ async def buton_tiklama_yoneticisi(update: Update, context: ContextTypes.DEFAULT
     
     await query.answer() 
 
-    # Grup Kuralları Butonu (Herkes tıklayabilir)
     if query.data == "kurallari_goster":
         try:
             await context.bot.send_message(chat_id=tiklayan_kisi.id, text=KURALLAR_METNI)
@@ -120,7 +151,6 @@ async def buton_tiklama_yoneticisi(update: Update, context: ContextTypes.DEFAULT
         except Exception:
             await query.answer(text="⚠️ Kuralları gönderebilmem için botun üzerine tıklayıp önce /start mesajı atmalısın!", show_alert=True)
             
-    # Moderasyon Butonları (Sadece listedeki YÖNETİCİLER tıklayabilir)
     elif query.data.startswith("at_") or query.data == "iptal_et":
         if tiklayan_kisi.id not in YONETICILER:
             await query.answer(text="⚠️ Bu butonu kullanmaya yetkiniz yok!", show_alert=True)
@@ -134,7 +164,7 @@ async def buton_tiklama_yoneticisi(update: Update, context: ContextTypes.DEFAULT
             try:
                 await context.bot.ban_chat_member(chat_id=grup_id, user_id=atilan_kisi_id)
                 await query.edit_message_text(text=f"{query.message.text}\n\n✅ **İşlem Başarılı:** Oyuncu {tiklayan_kisi.first_name} tarafından gruptan atıldı!", parse_mode="Markdown")
-            except Exception as e:
+            except Exception:
                 await query.edit_message_text(text=f"{query.message.text}\n\n⚠️ **Hata:** Oyuncu atılamadı. Botun grupta yetkilerini kontrol edin.", parse_mode="Markdown")
                 
         elif query.data == "iptal_et":
@@ -144,11 +174,12 @@ def main():
     app = Application.builder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("duyuru", duyuru_komutu)) # Yeni Duyuru Komutu
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, yeni_uyeleri_karsila))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, kufur_kontrol))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, metin_kontrol)) # Güncellenmiş Metin Dinleyici
     app.add_handler(CallbackQueryHandler(buton_tiklama_yoneticisi))
 
-    logger.info("✅ Bot başarıyla ayağa kalktı. Üçlü yönetici sistemi ve küfür filtresi aktif...")
+    logger.info("✅ Bot başarıyla ayağa kalktı. Duyuru sistemi ve AI altyapısı aktif...")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
