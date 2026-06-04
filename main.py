@@ -1,4 +1,3 @@
-import os
 import logging
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
@@ -9,8 +8,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Railway'den TOKEN'ı çekiyoruz
-TOKEN = os.getenv("TOKEN")
+# DOĞRUDAN EKLENMİŞ TOKEN
+TOKEN = "8855568852:AAG8I-2B_ZjkWQVIR5a4GL0PjzyyR5aZ3kg"
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -22,11 +21,6 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"Bunu yazdın: {mesaj}")
 
 def main():
-    # Eğer Railway TOKEN'ı okuyamazsa sessizce çökmek yerine konsola uyarı basacak
-    if not TOKEN:
-        logger.error("🚨 HATA: TOKEN bulunamadı! Lütfen Railway 'Variables' sekmesini kontrol et.")
-        return
-
     # Bot uygulamasını oluştur
     app = Application.builder().token(TOKEN).build()
 
