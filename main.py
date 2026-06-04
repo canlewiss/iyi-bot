@@ -21,8 +21,7 @@ GRUP_ID = -1003991253158
 # SADECE PARTİ ETKİNLİĞİNİN YAPILDIĞI GRUBUN ID NUMARASI
 PARTI_GRUP_ID = -1003991253158 
 
-# ⚠️ PARTİ ALT KANALININ (KONUSUNUN) ID NUMARASI 
-# Linkten alınan 2 numaralı ID
+# PARTİ ALT KANALININ (KONUSUNUN) ID NUMARASI 
 PARTI_KONU_ID = 2  
 
 # YASAKLI KELİMELER LİSTESİ
@@ -53,18 +52,28 @@ PARTI_KURALLARI = """📜 **Parti Etkinliği Kuralları:**
 2️⃣ Söz verdiğiniz parti miktarını eksiksiz teslim etmelisiniz.
 3️⃣ Sırayı bozmak veya başkasının hakkını yemek yasaktır."""
 
+# GÜNCELLENEN KISIM: Akıllı ve Sıralı Liste Oluşturucu
 def liste_olustur():
     if not PARTI_LISTESI:
         return "📋 Şu an parti listesi tamamen boş.", []
         
+    # Listeyi en çok parti verenden en aza doğru sıralar
+    sirali_liste = sorted(PARTI_LISTESI.items(), key=lambda item: item[1]['sayi'], reverse=True)
+    
     metin = "📋 **GÜNCEL PARTİ LİSTESİ**\n\n"
     klavye = []
     
     sayac = 1
-    for uid, veri in PARTI_LISTESI.items():
+    toplam_parti = 0
+    
+    for uid, veri in sirali_liste:
         metin += f"*{sayac}.* {veri['isim']} - {veri['sayi']} Parti\n"
+        toplam_parti += veri['sayi']
         klavye.append([InlineKeyboardButton(f"❌ {veri['isim']} adlı oyuncuyu sil", callback_data=f"psil_{uid}")])
         sayac += 1
+        
+    # Listenin sonuna toplam miktarı ekle
+    metin += f"\n📊 **Toplam Parti Miktarı:** {toplam_parti}"
         
     return metin, klavye
 
@@ -130,7 +139,6 @@ async def metin_kontrol(update: Update, context: ContextTypes.DEFAULT_TYPE):
     kullanici_id = update.effective_user.id
     kullanici = update.effective_user
     chat_id = update.message.chat_id
-    # Mesajın geldiği alt kanal (Topic) ID'sini alıyoruz
     konu_id = update.message.message_thread_id
 
     if update.effective_chat.type == "private":
@@ -172,8 +180,13 @@ async def metin_kontrol(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
             
         elif durum == "SAYI_BEKLIYOR":
+            # Girilen verinin sadece rakam olup olmadığını kontrol eder
+            if not mesaj.isdigit():
+                await update.message.reply_text("⚠️ Lütfen sadece rakam kullanarak geçerli bir sayı girin (Örn: 5):", reply_to_message_id=update.message.message_id)
+                return
+
             isim = KULLANICI_DURUMLARI[kullanici_id]["isim"]
-            sayi = mesaj
+            sayi = int(mesaj) # Rakamı sayısal veriye çevirip kaydeder
             
             PARTI_LISTESI[kullanici_id] = {"isim": isim, "sayi": sayi}
             del KULLANICI_DURUMLARI[kullanici_id]
@@ -182,24 +195,49 @@ async def metin_kontrol(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(sonuc_mesaji, parse_mode="Markdown", reply_to_message_id=update.message.message_id)
             return
 
-    # GÜNCELLENEN KISIM: Konu ID'si kontrolü (Sadece ID: 2 olan kanalda çalışır)
+    # GÜNCELLENEN KISIM: Zaten Listede Olan Kullanıcı Kontrolü
     if chat_id == PARTI_GRUP_ID and konu_id == PARTI_KONU_ID and mesaj == "PARTİ":
-        klavye = [
-            [InlineKeyboardButton("✅ Evet", callback_data="parti_evet"),
-             InlineKeyboardButton("❌ Hayır", callback_data="parti_hayir")]
-        ]
-        await update.message.reply_text(
-            f"🎉 Merhaba {kullanici.first_name}! Parti etkinlik kanalına hoş geldin. Etkinliğe katılmak ister misin?",
-            reply_markup=InlineKeyboardMarkup(klavye),
-            reply_to_message_id=update.message.message_id
-        )
+        if kullanici_id in PARTI_LISTESI:
+            # Eğer kullanıcı zaten listedeyse çıkmak isteyip istemediğini sor
+            klavye = [
+                [InlineKeyboardButton("✅ Evet (Listeden Çık)", callback_data="cikis_evet"),
+                 InlineKeyboardButton("❌ Hayır (Listede Kal)", callback_data="cikis_hayir")]
+            ]
+            await update.message.reply_text(
+                f"⚠️ {kullanici.first_name}, zaten parti etkinliğine katıldınız. Çıkmak istiyor musunuz?",
+                reply_markup=InlineKeyboardMarkup(klavye),
+                reply_to_message_id=update.message.message_id
+            )
+        else:
+            # Kullanıcı listede değilse normal kayıt sürecini başlat
+            klavye = [
+                [InlineKeyboardButton("✅ Evet", callback_data="parti_evet"),
+                 InlineKeyboardButton("❌ Hayır", callback_data="parti_hayir")]
+            ]
+            await update.message.reply_text(
+                f"🎉 Merhaba {kullanici.first_name}! Parti etkinlik kanalına hoş geldin. Etkinliğe katılmak ister misin?",
+                reply_markup=InlineKeyboardMarkup(klavye),
+                reply_to_message_id=update.message.message_id
+            )
 
 async def buton_tiklama_yoneticisi(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     tiklayan_kisi = query.from_user
     await query.answer() 
 
-    if query.data == "parti_hayir":
+    # --- Zaten Listede Olan Kullanıcının Çıkış İşlemleri ---
+    if query.data == "cikis_evet":
+        if tiklayan_kisi.id in PARTI_LISTESI:
+            del PARTI_LISTESI[tiklayan_kisi.id]
+            await query.edit_message_text("✅ Listeden başarıyla çıktınız. Dilerseniz tekrar 'PARTİ' yazarak katılabilirsiniz.")
+        else:
+            await query.edit_message_text("⚠️ Zaten listede değilsiniz.")
+
+    elif query.data == "cikis_hayir":
+        await query.edit_message_text("✅ Hayır olarak işaretlediniz, listede olmaya devam edeceksiniz.")
+
+    # --- Normal Kayıt İşlemleri ---
+    elif query.data == "parti_hayir":
         await query.edit_message_text("Tamamdır, partiye dahil edilmediniz. 😔")
         if tiklayan_kisi.id in KULLANICI_DURUMLARI:
             del KULLANICI_DURUMLARI[tiklayan_kisi.id]
@@ -208,6 +246,7 @@ async def buton_tiklama_yoneticisi(update: Update, context: ContextTypes.DEFAULT
         KULLANICI_DURUMLARI[tiklayan_kisi.id] = {"durum": "ISIM_BEKLIYOR"}
         await query.edit_message_text("Harika! 🎮 Lütfen oyundaki ismini yaz:")
         
+    # --- Yöneticinin Listeden Oyuncu Silme İşlemi ---
     elif query.data.startswith("psil_"):
         if tiklayan_kisi.id not in YONETICILER:
             await query.answer("⚠️ Yetkiniz yok!", show_alert=True)
@@ -225,6 +264,7 @@ async def buton_tiklama_yoneticisi(update: Update, context: ContextTypes.DEFAULT
         except Exception:
             pass
 
+    # --- Kurallar ve Küfür Ban İşlemleri ---
     elif query.data == "kurallari_goster":
         try:
             await context.bot.send_message(chat_id=tiklayan_kisi.id, text=KURALLAR_METNI)
@@ -259,7 +299,7 @@ def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, metin_kontrol))
     app.add_handler(CallbackQueryHandler(buton_tiklama_yoneticisi))
 
-    logger.info("✅ Bot başarıyla ayağa kalktı. Filtrelenmiş Parti Etkinliği Sistemi Aktif!")
+    logger.info("✅ Bot başarıyla ayağa kalktı. Mükemmelleştirilmiş Parti Sistemi Aktif!")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
